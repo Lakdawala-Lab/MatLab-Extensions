@@ -4,7 +4,9 @@ This directory contains matlab scripts that can be used as XTension plugins with
 
 To use these extensions for analysis of images, simply copy the '.m' files into your Imaris MATLAB XTensions directory. In Windows, this is usually found under 
 
-> C:\Program Files\Bitplane\Imaris x64 8.4.1\XT\matlab\ . 
+> C:\Program Files\Bitplane\Imaris x64 8.4.1\XT\matlab\ 
+
+or replace 'C:\Program Files\Bitplane\Imaris x64 8.4.1' with the directory in which you can find your Imaris installation. 
 
 Once copied, restart Imaris, or under Preferences>CustomTools>Xtension Folders, re-choose the above mentioned directory and the new scripts will show up under "Tools" . For example, the XTSpotsColocalizeFISH.m will appear under "Tools", denoted by the pink cog, when a "Spots" object is selected and under Image Processing>Spots Functions.
 
