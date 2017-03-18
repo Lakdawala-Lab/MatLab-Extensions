@@ -1,4 +1,4 @@
-#Matlab-Extensions
+# Matlab-Extensions
 
 This directory contains matlab scripts that can be used as XTension plugins with image processing software Imaris from BitPlane. To use these extensions for analysis of images, simply copy the '.m' files into your Imaris MATLAB XTensions directory. In Windows, this is usually found under C:\Program Files\Bitplane\Imaris x64 8.4.1\XT\matlab\ .
 
