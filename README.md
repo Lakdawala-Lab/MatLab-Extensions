@@ -1,6 +1,6 @@
 # Matlab-Extensions
 
-This directory contains matlab scripts that can be used as XTension plugins with the image processing software Imaris from BitPlane. Feel free to use these scripts in your analysis and modify them as needed.
+This directory contains matlab scripts that can be used as XTension plugins with the image processing software Imaris from BitPlane. The following scripts are useful for finding colocalized spots across multiple microscopy channels in images obtained from techniques such as fluorescence in-situ hybridization (FISH). Feel free to use these scripts in your analysis and modify them as needed. 
 
 To use these extensions for analysis of images, simply copy the '.m' files into your Imaris MATLAB XTensions directory. In Windows, this is usually found under 
 
