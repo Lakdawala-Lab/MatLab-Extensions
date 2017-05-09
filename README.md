@@ -16,3 +16,6 @@ Filename | function
 ---------|---------
 XTSpotsColocalizeFISH.m | finds colocalized spots from a collection of up to 3 spot objects.
 XTSpotsColocalizeFISH4.m | finds colocalized spots from a collection of up to 4 spot objects.
+XTExportSpotsXLS.m | export spot and track information from a time-resolved Imaris dataset
+XTTrackConnectStartAndEnd.m | identify split/merge locations and make missing connections in Imaris
+node_network_analysis.m | use XLS file exported by XTExportSpotsXLS.m to analyse as a directed graph in MATLAB
