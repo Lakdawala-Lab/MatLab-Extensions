@@ -70,11 +70,12 @@ vObjects = vImarisApplication.GetSurpassSelection;
 vDataSet = vImarisApplication.GetDataSet;
 if vFactory.IsSpots(vObjects)
   vObjects = vFactory.ToSpots(vObjects);
+  vSpotIds = vObjects.GetIds;
   vCoords = vObjects.GetPositionsXYZ;
   vTimes = vObjects.GetIndicesT + 1;
   vRadius = vObjects.GetRadiiXYZ;
   vNumberOfObjects = numel(vTimes);
-  vScene = vObjects.GetParent;
+  vObjPar = vObjects.GetParent;
 elseif vFactory.IsSurfaces(vObjects)
   vObjects = vFactory.ToSurfaces(vObjects);
   vNumberOfObjects = vObjects.GetNumberOfSurfaces;
@@ -98,66 +99,75 @@ vMergeTrue = false(numel(vTimes), 1);
 
 % get the edges
 vEdges = vObjects.GetTrackEdges + 1; % indices start from 1 here (matlab)
-if isempty(vEdges)  
-  msgbox('Please select some tracks!')
-  return
-end
+% if isempty(vEdges)  
+  % msgbox('Please select some tracks!')
+  % return
+% end
 vNumberOfEdges = size(vEdges, 1);
 
 %%%%%%%%%%%% get clipping plane info%%%%%%%%%
-vScenePar=vScene.GetParent;
+vScene=vImarisApplication.GetSurpassScene;
 vNumberOfClippingPlanes = 0;
-vCPList{vScenePar.GetNumberOfChildren} = [];
-vCPNamesList{vScenePar.GetNumberOfChildren} = [];
-for vChildIndex = 1:vScenePar.GetNumberOfChildren
-    vDataItem = vScenePar.GetChild(vChildIndex - 1);
+msgbox(['num of parents of scene: ',num2str(vScene.GetNumberOfChildren)])
+vCPList{vScene.GetNumberOfChildren} = [];
+vCPNamesList{vScene.GetNumberOfChildren} = [];
+for vChildIndex = 1:vScene.GetNumberOfChildren
+    vDataItem = vScene.GetChild(vChildIndex - 1);
     if vImarisApplication.GetFactory.IsClippingPlane(vDataItem)
         vNumberOfClippingPlanes = vNumberOfClippingPlanes+1;
         vCPList{vNumberOfClippingPlanes} = vImarisApplication.GetFactory.ToClippingPlane(vDataItem);
         vCPNamesList{vNumberOfClippingPlanes} = char(vDataItem.GetName);
     end
 end
-
+ifCoverslip=false;
 if vNumberOfClippingPlanes<1
-    msgbox('Please define at least 1 Clipping Plane');
-    return;
+	answer = questdlg('No clipping planes were found. Continue anyway?', ...
+	'Clipping planes not found', ...
+	'Yes','No','Yes');
+	if strcmp(answer,'No')
+		msgbox('Please define at least 1 Clipping Plane');
+		return;
+	end
 end
+d=nan;
+if vNumberOfClippingPlanes>=1
+	ifCoverslip=true;
+	vCPNamesList = vCPNamesList(1:vNumberOfClippingPlanes);
 
-vCPNamesList = vCPNamesList(1:vNumberOfClippingPlanes);
+	% choose the clipping plane
+	vCPName = [];
+	while length(vCPName) < 1
+		[vCPName, vOk] = listdlg('ListString',vCPNamesList,'SelectionMode','multiple',...
+			'ListSize',[250 150],'Name','Select clipping plane','InitialValue',[1], ...
+			'PromptString',{'Please select one clipping plane to measure distance:'});
+		if vOk<1, return, end
+		if length(vCPName) < 1
+			vHandle = msgbox(['Please select only one object. Use "Control" and left ', ...
+				'click to select/unselect an object on the list.']);
+			uiwait(vHandle);
+		end
+	end
 
-% choose the clipping plane
-vCPName = [];
-while length(vCPName) < 1
-    [vCPName, vOk] = listdlg('ListString',vCPNamesList,'SelectionMode','multiple',...
-        'ListSize',[250 150],'Name','Select clipping plane','InitialValue',[1], ...
-        'PromptString',{'Please select one clipping plane to measure distance:'});
-    if vOk<1, return, end
-    if length(vCPName) < 1
-        vHandle = msgbox(['Please select only one objects. Use "Control" and left ', ...
-            'click to select/unselect an object of the list.']);
-        uiwait(vHandle);
-    end
+	vPlane = vCPList{vCPName(1)};
+	vPlaneXYZ = vPlane.GetPosition;
+	vClippingPlaneValues=vPlane.GetOrientationAxisAngle;
+	vAxis = vClippingPlaneValues.mAxisXYZ;
+	vAngle = vClippingPlaneValues.mAngle;
+	vQuaternion=vPlane.GetOrientationQuaternion;
+
+	% diagnostics for clipping plane. Uncomment the code below to troubleshoot
+	% any problems with the clipping plane information
+
+	%	message = sprintf(['Plane position: [',num2str(vPlaneXYZ'),' ] \n', ...
+	%		'Axis: [', num2str(vAxis'),' ] \n',... 
+	%		'Angle: [', num2str(vAngle) ,' ] \n',...
+	%		'Quaternion: [', num2str(vQuaternion') ]);
+	%	msgbox(message);
+
+	% calculate quantity 'd' for clipping plane. This number is 
+	% to be used later to calculate distance from the coverslip
+	d = vPlaneXYZ(1)-vPlaneXYZ(3);
 end
-
-vPlane = vCPList{vCPName(1)};
-vPlaneXYZ = vPlane.GetPosition;
-vClippingPlaneValues=vPlane.GetOrientationAxisAngle;
-vAxis = vClippingPlaneValues.mAxisXYZ;
-vAngle = vClippingPlaneValues.mAngle;
-vQuaternion=vPlane.GetOrientationQuaternion;
-
-% diagnostics for clipping plane. Uncomment the code below to troubleshoot
-% any problems with the clipping plane information
-
-%	message = sprintf(['Plane position: [',num2str(vPlaneXYZ'),' ] \n', ...
-%		'Axis: [', num2str(vAxis'),' ] \n',... 
-%		'Angle: [', num2str(vAngle) ,' ] \n',...
-%		'Quaternion: [', num2str(vQuaternion') ]);
-%	msgbox(message);
-
-% calculate quantity 'd' for clipping plane. This number is 
-% to be used later to calculate distance from the coverslip
-d = vPlaneXYZ(1)-vPlaneXYZ(3);
 
 %%%%%%%%%%%%%%% get spot intensity info
 
@@ -181,6 +191,7 @@ for vTime = vStart:vEnd
 	for vSpot1 = 1:numel(vValid1)
 		vColocated1 = vValid1(vSpot1); % index of the present spot
 		vSpotCoordXYZ=int32(floor((vCoords(vColocated1, :)-vExtMin)./vVoxelSize));
+		%vSpotPosXYZ=(vCoords(vColocated1, :)-vExtMin);
 		try
 			tempInt = vDataSet.GetDataSubVolumeShorts(vSpotCoordXYZ(1), vSpotCoordXYZ(2), vSpotCoordXYZ(3), int32(0), int32(vTime-1), int32(1), int32(1), int32(1)) ;
 		catch 
@@ -192,7 +203,9 @@ for vTime = vStart:vEnd
 			msgbox(['Warning: failed to acquire intensity for spot ',num2str(vColocated1)]);
 		end
 		vIntSpot (vColocated1) = mean(mean(mean(tempInt)));
-		vDistSpot(vColocated1) = (1/sqrt(2))*(-vCoords(vColocated1, 1)+vCoords(vColocated1, 3)+d);
+		if ifCoverslip
+			vDistSpot(vColocated1) = (1/sqrt(2))*(-vCoords(vColocated1, 1)+vCoords(vColocated1, 3)+d);
+		end
 	end
 	% update the progress bar
     waitbar(double(vTime-vStart+1)/double(vEnd-vStart+1), vProgressDisplay);
@@ -207,17 +220,53 @@ comp_path = fullfile(xlspathname,xlsfilename);
 if isempty(xlsfilename), return, end
 
 % write a worksheet with information about spots: location, timestamp, intensity, and distance from coverslip
-data_out=double([double(vCoords),double(vTimes), double(vIntSpot),double(vDistSpot)]);
-data_cells=num2cell(data_out);     %Convert data to cell array
-col_header={'Position X','Position Y','Position Z','TimeStamp','Intensity','Dist to Coverslip'};     % column labels
-output_matrix=[ col_header; data_cells];     %Join cell arrays
-format long 
-xlswrite(comp_path,  output_matrix, 'spots info');
+if ifCoverslip
+	data_out=double([double(vSpotIds), double(vCoords),double(vTimes), double(vIntSpot),double(vDistSpot)]);
+	col_header={'Spot index','Position X','Position Y','Position Z','TimeStamp','Intensity','Dist to Coverslip'};     % column labels
+else
+	data_out=double([double(vSpotIds), double(vCoords),double(vTimes), double(vIntSpot)]);
+	col_header={'Spot index','Position X','Position Y','Position Z','TimeStamp','Intensity'};     % column labels
+end
 
-% write another worksheet with information about track edges
-% each row contains a two values: index of spot where an edge begins 
-% and index of spot where that edge ends. This describes a single edge of the track network
-data_cells2=num2cell(double(vEdges));     %Convert data to cell array
-col_header2={'start index','end index'};     %Row cell array (for column labels)
-output_matrix2=[ col_header2; data_cells2];
-xlswrite(comp_path,  output_matrix2, 'track edges');
+format long 
+if length(data_out)<1000000
+	data_cells=num2cell(data_out);     %Convert data to cell array
+	output_matrix=[ col_header; data_cells];     %Join cell arrays
+	xlswrite(comp_path,  output_matrix, 'spots info');
+
+	% write another worksheet with information about track edges
+	% each row contains a two values: index of spot where an edge begins 
+	% and index of spot where that edge ends. This describes a single edge of the track network
+	if ~isempty(vEdges)
+		data_cells2=num2cell(double(vEdges));     %Convert data to cell array
+		col_header2={'start index','end index'};     %Row cell array (for column labels)
+		output_matrix2=[ col_header2; data_cells2];
+		xlswrite(comp_path,  output_matrix2, 'track edges');
+	end
+else
+	fnamecomps=split(xlsfilename,'.');
+	for partnumber = 1 : ceil(length(data_out)/1000000)
+		newfname=fnamecomps{1}+"_part"+num2str(partnumber)+"."+fnamecomps{2};
+		comp_path = fullfile(xlspathname,newfname);
+		if partnumber*1000000>length(data_out)
+			data_cells=num2cell(data_out((partnumber-1)*1000000+1:end,:));     %Convert data to cell array
+		else
+			data_cells=num2cell(data_out((partnumber-1)*1000000+1:partnumber*1000000,:));     %Convert data to cell array
+		end
+		output_matrix=[ col_header; data_cells];     %Join cell arrays
+		
+		xlswrite(comp_path,  output_matrix, 'spots info');
+
+		% write another worksheet with information about track edges
+		% each row contains a two values: index of spot where an edge begins 
+		% and index of spot where that edge ends. This describes a single edge of the track network
+		if ~isempty(vEdges)
+			data_cells2=num2cell(double(vEdges));     %Convert data to cell array
+			col_header2={'start index','end index'};     %Row cell array (for column labels)
+			output_matrix2=[ col_header2; data_cells2];
+			xlswrite(comp_path,  output_matrix2, 'track edges');
+		end
+		
+		
+	end	
+end
